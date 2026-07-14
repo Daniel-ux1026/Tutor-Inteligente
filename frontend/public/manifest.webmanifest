@@ -1,0 +1,16 @@
+{
+  "name": "Tutor Inteligente Adaptativo",
+  "short_name": "Tutor IA",
+  "description": "Práctica adaptativa offline de Matemática y Comunicación para secundaria.",
+  "lang": "es-PE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f8fb",
+  "theme_color": "#087f7a",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

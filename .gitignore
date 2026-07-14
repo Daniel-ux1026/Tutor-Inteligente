@@ -1,0 +1,21 @@
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Backend
+backend/target/
+
+# Python
+ia/.venv/
+ia/**/__pycache__/
+ia/.pytest_cache/
+
+# Environment and IDE
+.env
+*.log
+.idea/
+.vscode/
+
+# Generated runtime data
+sqlserver-data/

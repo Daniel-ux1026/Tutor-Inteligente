@@ -1,0 +1,8 @@
+IF DB_ID(N'TutorInteligente') IS NULL
+BEGIN
+    CREATE DATABASE TutorInteligente;
+END;
+GO
+
+ALTER DATABASE TutorInteligente SET RECOVERY SIMPLE;
+GO

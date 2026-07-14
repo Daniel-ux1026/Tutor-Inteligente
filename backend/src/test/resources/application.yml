@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:tutor;MODE=MSSQLServer;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+app:
+  jwt:
+    secret: test-secret-with-more-than-thirty-two-characters
+    access-minutes: 30
+    refresh-days: 7
+  ai:
+    base-url: http://localhost:65534
+    timeout-ms: 100
+  cors:
+    allowed-origins: http://localhost:5173
+  demo-data: false
