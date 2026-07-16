@@ -41,8 +41,8 @@ Consulta [ARQUITECTURA.md](docs/ARQUITECTURA.md) para los flujos adaptativo, off
 - Windows 10/11.
 - JDK 21.
 - Maven 3.9+ para compilar o iniciar el backend desde una clonación nueva. El directorio `backend/target` no se publica en Git.
-- Node.js 20+ y npm.
-- Python 3.11+.
+- Node.js 24 LTS y npm/npx.
+- Python 3.12 recomendado para repetir localmente las pruebas de IA; Railway lo incluye en el contenedor.
 - Docker Desktop (recomendado) o SQL Server 2019 local.
 
 ## Despliegue web
@@ -51,7 +51,11 @@ La aplicación completa requiere frontend, backend persistente, servicio de IA, 
 
 La configuración incluida despliega los cuatro servicios en Railway con frontend y backend públicos por HTTPS, mientras IA y SQL Server permanecen en la red privada. Incluye Dockerfiles sin privilegios, health checks, cabeceras de seguridad, clave interna para la IA, invitación docente, CORS por dominio y controles para desactivar demo, recuperación local y Swagger.
 
-Consulta [DESPLIEGUE_SEGURO.md](docs/DESPLIEGUE_SEGURO.md) para la arquitectura, variables y verificación.
+Para verificar y desplegar todo automáticamente, haz doble clic en `DESPLEGAR_TUTOR_INTELIGENTE.bat`. La primera ejecución inicia sesión en Railway, crea los cuatro servicios, configura el volumen y los secretos, despliega en orden y abre la web cuando los health checks responden. Las ejecuciones posteriores reutilizan el mismo proyecto y conservan los secretos existentes.
+
+No se necesita Docker Desktop para este despliegue porque las imágenes se construyen en Railway. SQL Server usa la edición Developer, válida para demostración y desarrollo, no para explotación comercial.
+
+Consulta [DESPLIEGUE_SEGURO.md](docs/DESPLIEGUE_SEGURO.md) para los pasos, requisitos, arquitectura, variables y solución de problemas.
 
 ## Inicio rápido
 

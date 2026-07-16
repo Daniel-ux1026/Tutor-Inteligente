@@ -26,6 +26,12 @@ jobs:
           - python
     steps:
       - uses: actions/checkout@v4
+      - if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
       - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}

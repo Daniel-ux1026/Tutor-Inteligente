@@ -20,6 +20,58 @@ Internet
 
 Railway proporciona TLS para los dominios públicos y red privada cifrada entre servicios. El servicio IA y SQL Server no deben recibir dominios públicos ni TCP Proxy.
 
+## Despliegue automático con doble clic
+
+### Requisitos en Windows
+
+1. JDK 21 y Maven 3.9 o superior.
+2. Node.js 24 LTS, que incluye `npm` y `npx`.
+3. Python 3.12 recomendado para repetir localmente las pruebas de IA. Si no está instalado, el lanzador lo informa y Railway construye el servicio con Python 3.12 dentro del contenedor.
+4. Una cuenta de Railway con un plan que permita ejecutar cuatro servicios y un volumen. SQL Server necesita más memoria que una aplicación web pequeña.
+5. Conexión a Internet durante la verificación y el despliegue.
+
+Docker Desktop no es necesario: Railway compila los Dockerfiles en sus propios constructores.
+
+### Ejecución recomendada
+
+1. Abre la raíz del proyecto.
+2. Haz doble clic en `DESPLEGAR_TUTOR_INTELIGENTE.bat`.
+3. Si Railway solicita autenticación, completa el inicio de sesión oficial en el navegador.
+4. Espera mientras el lanzador:
+   - verifica la estructura y que `.env` no esté registrado en Git;
+   - ejecuta las pruebas del backend, IA y frontend;
+   - crea o reutiliza el proyecto de Railway;
+   - crea `sqlserver`, `ia`, `backend` y `frontend`;
+   - adjunta un volumen a SQL Server;
+   - genera secretos criptográficos sin escribirlos en el repositorio;
+   - crea dominios públicos solo para frontend y backend;
+   - despliega en el orden correcto y verifica los health checks.
+5. Al terminar se muestran la URL de la web, la URL de la API y el código privado para registrar docentes. Guarda ese código en un gestor de contraseñas.
+
+Las siguientes ejecuciones reutilizan el proyecto enlazado, mantienen las contraseñas y vuelven a desplegar el contenido actual de la carpeta.
+
+### Opciones útiles
+
+Desde una terminal abierta en la raíz:
+
+```powershell
+# Comprobar estructura, dependencias, pruebas, build y auditoría sin usar Railway
+.\DESPLEGAR_TUTOR_INTELIGENTE.bat -SoloVerificar
+
+# Desplegar sin repetir las pruebas locales
+.\DESPLEGAR_TUTOR_INTELIGENTE.bat -OmitirPruebas
+
+# Evitar que se abra el navegador al terminar
+.\DESPLEGAR_TUTOR_INTELIGENTE.bat -NoAbrirNavegador
+```
+
+Si tu cuenta tiene varios espacios de trabajo y Railway no puede elegir uno, define antes su nombre o identificador:
+
+```powershell
+$env:RAILWAY_WORKSPACE = "mi-workspace"
+.\DESPLEGAR_TUTOR_INTELIGENTE.bat
+```
+
 ## Configuración por servicio
 
 Cada servicio utiliza el mismo repositorio y una ruta de configuración distinta:
@@ -31,7 +83,7 @@ Cada servicio utiliza el mismo repositorio y una ruta de configuración distinta
 | `ia` | `/ia/railway.json` | `/ia/Dockerfile` | 8001 | `/health` |
 | `sqlserver` | `/database/railway.json` | `/database/Dockerfile` | 1433 | interno |
 
-En Railway, configura `Config File Path` con el archivo correspondiente. Adjunta un volumen al servicio `sqlserver` en `/var/opt/mssql`.
+El lanzador automático aplica estas rutas y adjunta el volumen de `sqlserver` en `/var/opt/mssql`. Los archivos `railway.json` quedan como configuración declarativa de referencia para una configuración manual.
 
 ## Variables
 
@@ -129,3 +181,12 @@ Después de cambiar una variable `VITE_*`, es necesario volver a desplegar el fr
 6. Confirmar que una llamada directa a `/predict` sin `X-Internal-API-Key` es rechazada.
 7. Revisar cabeceras HTTPS y que Swagger no esté disponible.
 8. Probar respaldo y restauración del volumen antes de almacenar información importante.
+
+## Solución de problemas
+
+- Si falla una prueba local, corrige primero el módulo señalado; también puedes usar `-OmitirPruebas` únicamente cuando ya validaste ese mismo commit en GitHub Actions.
+- Si Railway rechaza la creación de recursos, revisa los límites o la facturación de tu cuenta.
+- Si un servicio falla, el lanzador indica un comando `railway logs` para consultar sus últimas 100 líneas.
+- Si el frontend abre pero no inicia sesión, comprueba que el backend responda en `/actuator/health` y que `CORS_ORIGINS` coincida con el dominio del frontend.
+- Si SQL Server no inicia, revisa que el volumen esté montado en `/var/opt/mssql` y que el plan tenga memoria suficiente.
+- No publiques dominios para `ia` ni `sqlserver`. Si ya existen, elimínalos desde el panel de Railway.
