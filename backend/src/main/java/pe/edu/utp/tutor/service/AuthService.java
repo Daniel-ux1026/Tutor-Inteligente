@@ -3,9 +3,14 @@ package pe.edu.utp.tutor.service;
 import static pe.edu.utp.tutor.web.dto.ApiDtos.*;
 
 import io.jsonwebtoken.Claims;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,11 +29,21 @@ public class AuthService {
     private final PasswordRecoveryTokenRepository recoveryTokens;
     private final PasswordEncoder encoder;
     private final JwtService jwt;
+    private final String teacherInvitationCode;
+    private final boolean recoveryEnabled;
+    private final boolean exposeLocalRecoveryCode;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(UserRepository users, RoleRepository roles, StudentRepository students, TeacherRepository teachers,
-                       PasswordRecoveryTokenRepository recoveryTokens, PasswordEncoder encoder, JwtService jwt) {
+                       PasswordRecoveryTokenRepository recoveryTokens, PasswordEncoder encoder, JwtService jwt,
+                       @Value("${app.registration.teacher-invitation-code:}") String teacherInvitationCode,
+                       @Value("${app.recovery.enabled:true}") boolean recoveryEnabled,
+                       @Value("${app.recovery.expose-local-code:true}") boolean exposeLocalRecoveryCode) {
         this.users = users; this.roles = roles; this.students = students; this.teachers = teachers;
         this.recoveryTokens = recoveryTokens; this.encoder = encoder; this.jwt = jwt;
+        this.teacherInvitationCode = teacherInvitationCode == null ? "" : teacherInvitationCode.trim();
+        this.recoveryEnabled = recoveryEnabled;
+        this.exposeLocalRecoveryCode = exposeLocalRecoveryCode;
     }
 
     @Transactional
@@ -55,6 +70,9 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         if (users.existsByEmailIgnoreCase(request.email())) throw new ResponseStatusException(HttpStatus.CONFLICT, "El correo ya está registrado.");
         String roleName = request.role() == null ? "STUDENT" : request.role();
+        if ("TEACHER".equals(roleName) && !validTeacherInvitation(request.teacherInvitationCode())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El código de invitación docente no es válido.");
+        }
         RoleEntity role = roles.findByName(roleName).orElseThrow();
         UserEntity user = new UserEntity();
         user.setEmail(request.email().trim().toLowerCase()); user.setFullName(request.fullName().trim());
@@ -82,21 +100,43 @@ public class AuthService {
 
     @Transactional
     public Map<String, Object> recovery(RecoveryRequest request) {
-        UserEntity user = users.findByEmailIgnoreCase(request.email())
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe una cuenta con ese correo."));
+        String genericMessage = "Si la cuenta existe y la recuperación está habilitada, recibirás instrucciones para continuar.";
+        if (!recoveryEnabled) {
+            if (request.code() != null && !request.code().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "La recuperación de contraseña no está habilitada.");
+            }
+            return Map.of("message", genericMessage);
+        }
+        var foundUser = users.findByEmailIgnoreCase(request.email().trim());
         if (request.code() == null || request.code().isBlank()) {
-            String code = "246810";
+            if (foundUser.isEmpty()) return Map.of("message", genericMessage);
+            UserEntity user = foundUser.get();
+            String code = "%06d".formatted(secureRandom.nextInt(1_000_000));
             PasswordRecoveryTokenEntity token = new PasswordRecoveryTokenEntity(); token.setUser(user);
             token.setCodeHash(encoder.encode(code)); token.setExpiresAt(Instant.now().plus(15, ChronoUnit.MINUTES));
             recoveryTokens.save(token);
-            return Map.of("message", "Código local generado. En producción se enviará por correo.", "demoCode", code, "expiresInMinutes", 15);
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("message", exposeLocalRecoveryCode
+                ? "Código local generado para el entorno de desarrollo."
+                : genericMessage);
+            if (exposeLocalRecoveryCode) response.put("demoCode", code);
+            response.put("expiresInMinutes", 15);
+            return response;
         }
         if (request.newPassword() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ingresa la nueva contraseña.");
+        UserEntity user = foundUser.orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Código inválido o vencido."));
         PasswordRecoveryTokenEntity token = recoveryTokens.findByUserIdAndUsedAtIsNullOrderByExpiresAtDesc(user.getId()).stream()
             .filter(t -> t.getExpiresAt().isAfter(Instant.now()) && encoder.matches(request.code(), t.getCodeHash())).findFirst()
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Código inválido o vencido."));
         user.setPasswordHash(encoder.encode(request.newPassword())); users.save(user); token.setUsedAt(Instant.now()); recoveryTokens.save(token);
         return Map.of("message", "Contraseña actualizada correctamente.");
+    }
+
+    private boolean validTeacherInvitation(String supplied) {
+        if (teacherInvitationCode.isBlank() || supplied == null || supplied.isBlank()) return false;
+        return MessageDigest.isEqual(
+            teacherInvitationCode.getBytes(StandardCharsets.UTF_8),
+            supplied.trim().getBytes(StandardCharsets.UTF_8));
     }
 
     private AuthResponse response(UserEntity user) {

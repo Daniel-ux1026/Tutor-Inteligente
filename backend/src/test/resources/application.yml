@@ -16,6 +16,12 @@ app:
   ai:
     base-url: http://localhost:65534
     timeout-ms: 100
+    api-key:
   cors:
     allowed-origins: http://localhost:5173
   demo-data: false
+  registration:
+    teacher-invitation-code: test-teacher-invitation
+  recovery:
+    enabled: true
+    expose-local-code: true

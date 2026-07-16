@@ -4,14 +4,14 @@
 
 | Área | Comando | Resultado |
 |---|---|---|
-| IA | `python -m unittest discover -s tests -v` | 2/2 pruebas aprobadas |
+| IA | `python -m unittest discover -s tests -v` | 3/3 pruebas aprobadas, incluyendo el comportamiento de la credencial interna en entorno local |
 | IA | `python train_model.py` | 620 filas, 496 entrenamiento, 124 prueba; artefactos exportados |
 | IA API | `GET /health`, `GET /metrics`, `POST /predict` | Respuestas HTTP reales aprobadas; modelo listo y recomendación explicada |
 | Frontend | `vitest run` | 1/1 prueba aprobada |
 | Frontend | `vite build` | Build de producción aprobado; 1,601 módulos transformados |
 | Frontend HTTP | `GET /`, `/manifest.webmanifest`, `/sw.js` | HTTP 200; título, raíz React, manifest y service worker disponibles |
-| Backend | `mvn package` | 2/2 pruebas aprobadas; 58 archivos Java compilados y JAR generado |
-| Integración SQL Server 2019 | Flyway + arranque real | 5 migraciones, 20 tablas, 495 preguntas, 1980 alternativas y usuarios de demostración |
+| Backend | `mvn test` | 5/5 pruebas aprobadas; 59 archivos Java compilados, incluyendo cálculo de eficacia, consulta JPA que excluye cuentas demo e invitación obligatoria para registrar docentes |
+| Integración SQL Server 2019 | Flyway + arranque real | 6 migraciones, 20 tablas, 495 preguntas, 1980 alternativas y procedencia de cuentas |
 | Backend HTTP + autenticación | `/actuator/health` + `/api/auth/login` | Estado `UP` y JWT de alumno emitido correctamente |
 | Recomendación docente → alumno | `POST /teacher/students/{id}/observations` + `GET /student/notifications` | La recomendación apareció con el mismo identificador y texto; el dato temporal de prueba se eliminó |
 
@@ -44,6 +44,7 @@
 | A-23 | Cambia de diagnóstico | Dos pestañas sustituyen el desplegable y conservan la tarjeta lateral de avance. |
 | A-24 | Busca un tema en el banco | El buscador consulta el catálogo desde dos caracteres y no despliega todos los temas. |
 | A-25 | Consulta el panel principal docente | El panorama pedagógico es informativo y no contiene botones de redireccionamiento. |
+| A-26 | Consulta eficacia de aprendizaje | Excluye cuentas demo, compara ventanas inicial/reciente y no declara eficacia antes de cumplir los mínimos de muestra. |
 
 ## Prueba manual recomendada
 

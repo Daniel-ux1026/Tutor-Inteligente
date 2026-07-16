@@ -10,12 +10,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pe.edu.utp.tutor.service.NotificationService;
+import pe.edu.utp.tutor.service.LearningEffectivenessService;
 import pe.edu.utp.tutor.service.TeacherService;
 
 @RestController @RequestMapping("/api/teacher")
 public class TeacherController {
-    private final TeacherService service;private final NotificationService notificationService;
-    public TeacherController(TeacherService service,NotificationService notificationService){this.service=service;this.notificationService=notificationService;}
+    private final TeacherService service;private final NotificationService notificationService;private final LearningEffectivenessService effectivenessService;
+    public TeacherController(TeacherService service,NotificationService notificationService,LearningEffectivenessService effectivenessService){this.service=service;this.notificationService=notificationService;this.effectivenessService=effectivenessService;}
     @GetMapping("/dashboard") Map<String,Object> dashboard(Principal p){return service.dashboard(p.getName());}
     @GetMapping("/catalog") List<Map<String,Object>> catalog(){return service.catalog();}
     @GetMapping("/students") List<Map<String,Object>> students(@RequestParam Map<String,String> filters){return service.students(filters);}
@@ -33,6 +34,7 @@ public class TeacherController {
     @GetMapping("/activities") List<Map<String,Object>> activities(){return service.activities();}
     @PostMapping("/activities") @ResponseStatus(HttpStatus.CREATED) Map<String,Object> activity(Principal p,@Valid @RequestBody ActivityRequest r){return service.activity(p.getName(),r);}
     @PostMapping("/topics/assign") @ResponseStatus(HttpStatus.CREATED) Map<String,Object> topicAssignment(Principal p,@Valid @RequestBody TopicAssignmentRequest r){return service.generateTopicAndAssign(p.getName(),r);}
+    @GetMapping("/reports/learning-effectiveness") Map<String,Object> learningEffectiveness(){return effectivenessService.report();}
     @GetMapping("/settings") Map<String,Object> settings(Principal p){return service.settings(p.getName());}
     @PatchMapping("/settings") Map<String,Object> settings(Principal p,@Valid @RequestBody ClassroomSettingsRequest r){return service.saveSettings(p.getName(),r);}
 }

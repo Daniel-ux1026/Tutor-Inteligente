@@ -13,6 +13,7 @@
 | Recomendaciones del docente | Docente → Avance individual; Alumno → Notificaciones | `StudentProgressPage`, `StudentNotificationsPage`, `StudentService.notifications` | `POST /teacher/students/{id}/observations`, `GET /student/notifications` | `teacher_observations` | integración autenticada docente → alumno; flujo A-22 |
 | Diagnóstico con pestañas | Alumno → Diagnóstico | `DiagnosticPage`, `ClipboardSummary` | `GET /student/courses`, `GET/POST /student/diagnostics` | `diagnostic_results` | dos pestañas, cuestionario y tarjeta de avance; flujo A-23 |
 | Buscador de temas | Docente → Banco de preguntas | `QuestionsPage` | `GET /teacher/catalog` | `courses`, `topics` | resultados bajo demanda desde dos caracteres; flujo A-24 |
+| Evidencia de aprendizaje | Docente → Reportes | `ReportsPage`, `LearningEffectivenessService` | `GET /teacher/reports/learning-effectiveness` | `users`, `students`, `attempts`, `questions`, `topics` | exclusión de cuentas demo, comparación pareada y umbral de muestra; flujo A-26 |
 
 ## Criterios implementados
 
@@ -21,3 +22,4 @@
 - Los filtros se aplican en el backend; el navegador no inventa resultados.
 - El enlace contextual vive en la URL, por lo que sobrevive una recarga.
 - Alertas y notificaciones continúan disponibles tras cerrar sesión.
+- La eficacia observada se calcula con intentos persistidos y nunca con los registros usados para validar técnicamente el clasificador.

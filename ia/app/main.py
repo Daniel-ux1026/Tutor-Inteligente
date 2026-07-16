@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import hmac
 import json
+import os
 from pathlib import Path
 from typing import Literal
 
 import joblib
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_PATH = ROOT / "models" / "decision_tree_tutor.joblib"
 METRICS_PATH = ROOT / "reports" / "metrics.json"
 Level = Literal["basico", "intermedio", "avanzado"]
+INTERNAL_API_KEY = os.getenv("AI_SERVICE_API_KEY", "").strip()
+DOCS_ENABLED = os.getenv("AI_DOCS_ENABLED", "true").lower() == "true"
 
 
 class PredictionInput(BaseModel):
@@ -24,7 +28,13 @@ class PredictionInput(BaseModel):
     racha_aciertos: int = Field(ge=0)
 
 
-app = FastAPI(title="Tutor Inteligente - Servicio IA", version="1.0.0")
+app = FastAPI(
+    title="Tutor Inteligente - Servicio IA",
+    version="1.0.0",
+    docs_url="/docs" if DOCS_ENABLED else None,
+    redoc_url="/redoc" if DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if DOCS_ENABLED else None,
+)
 artifact = None
 
 
@@ -35,6 +45,17 @@ def load_artifact():
             raise HTTPException(status_code=503, detail="Modelo no entrenado. Ejecuta python train_model.py")
         artifact = joblib.load(MODEL_PATH)
     return artifact
+
+
+def require_internal_key(x_internal_api_key: str | None = Header(default=None)):
+    if INTERNAL_API_KEY and (
+        x_internal_api_key is None
+        or not hmac.compare_digest(x_internal_api_key, INTERNAL_API_KEY)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credencial interna no válida.",
+        )
 
 
 def explanation(data: PredictionInput, level: str) -> str:
@@ -52,14 +73,14 @@ def health():
     return {"status": "UP", "model_ready": MODEL_PATH.exists()}
 
 
-@app.get("/metrics")
+@app.get("/metrics", dependencies=[Depends(require_internal_key)])
 def metrics():
     if not METRICS_PATH.exists():
         raise HTTPException(status_code=503, detail="Métricas no disponibles. Entrena el modelo.")
     return json.loads(METRICS_PATH.read_text(encoding="utf-8"))
 
 
-@app.post("/predict")
+@app.post("/predict", dependencies=[Depends(require_internal_key)])
 def predict(data: PredictionInput):
     loaded = load_artifact()
     frame = pd.DataFrame([data.model_dump()])

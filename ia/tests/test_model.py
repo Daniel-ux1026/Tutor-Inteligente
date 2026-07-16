@@ -1,7 +1,7 @@
 import unittest
 
 from train_model import generate_dataset
-from app.main import PredictionInput, explanation
+from app.main import PredictionInput, explanation, require_internal_key
 
 
 class TutorModelTest(unittest.TestCase):
@@ -20,6 +20,9 @@ class TutorModelTest(unittest.TestCase):
         text = explanation(values, "intermedio")
         self.assertIn("4 aciertos", text)
         self.assertIn("0 errores", text)
+
+    def test_internal_key_is_optional_in_local_environment(self):
+        self.assertIsNone(require_internal_key(None))
 
 
 if __name__ == "__main__":

@@ -10,17 +10,17 @@ Tutor Inteligente es un prototipo funcional avanzado orientado al acompañamient
 |---|---|
 | Alumno | Diagnósticos de Matemática y Comunicación, ejercicios adaptativos, progreso, historial, actividades asignadas y notificaciones pedagógicas. |
 | Docente | Panel de seguimiento, alumnos paginados y filtrados por curso, alertas, observaciones, banco de preguntas, generación/asignación de temas y acceso contextual a **Ver avance**. |
-| Adaptación | Árbol de decisión explicable, métricas consultadas desde la API y reglas de respaldo cuando el servicio de IA no está disponible. |
+| Adaptación | Árbol de decisión explicable, métricas técnicas consultadas desde la API, evidencia de aprendizaje basada en actividad registrada y reglas de respaldo. |
 | Offline | PWA, caché de ejercicios, cola de intentos en IndexedDB, historial de sincronización e idempotencia mediante UUID. |
 | Datos y seguridad | SQL Server con migraciones Flyway, JWT, BCrypt, autorización por rol, bloqueo por intentos fallidos y validaciones en frontend/backend. |
 
 ### Estado actual
 
 - 33 de 38 funcionalidades inventariadas están completamente implementadas; una es parcial, una está documentada sin módulo funcional y tres permanecen pendientes.
-- La API contiene 38 operaciones distribuidas entre autenticación, alumno, docente e IA.
-- El esquema final contiene 20 tablas y cinco migraciones Flyway.
+- La API contiene 39 operaciones distribuidas entre autenticación, alumno, docente e IA.
+- El esquema final contiene 20 tablas y seis migraciones Flyway.
 - El banco inicial contiene 495 preguntas y 1 980 alternativas.
-- La IA se entrenó con 620 registros sintéticos y alcanzó 90.32 % de exactitud en la partición de prueba.
+- El clasificador base se entrenó con 620 registros generados de forma reproducible y alcanzó 90.32 % de exactitud técnica; el reporte pedagógico calcula sus indicadores con intentos de cuentas no demostrativas.
 - Es adecuado para demostración académica y pruebas locales; todavía no debe considerarse una plataforma lista para producción institucional.
 
 ## Arquitectura
@@ -44,6 +44,14 @@ Consulta [ARQUITECTURA.md](docs/ARQUITECTURA.md) para los flujos adaptativo, off
 - Node.js 20+ y npm.
 - Python 3.11+.
 - Docker Desktop (recomendado) o SQL Server 2019 local.
+
+## Despliegue web
+
+La aplicación completa requiere frontend, backend persistente, servicio de IA, eventos SSE y SQL Server. Por ello, Vercel puede alojar opcionalmente el frontend, pero no sustituye por sí solo todo el entorno.
+
+La configuración incluida despliega los cuatro servicios en Railway con frontend y backend públicos por HTTPS, mientras IA y SQL Server permanecen en la red privada. Incluye Dockerfiles sin privilegios, health checks, cabeceras de seguridad, clave interna para la IA, invitación docente, CORS por dominio y controles para desactivar demo, recuperación local y Swagger.
+
+Consulta [DESPLIEGUE_SEGURO.md](docs/DESPLIEGUE_SEGURO.md) para la arquitectura, variables y verificación.
 
 ## Inicio rápido
 
@@ -185,13 +193,13 @@ Artefactos reales incluidos:
 | Sensibilidad ponderada | 90.32 % |
 | Puntuación F1 ponderada | 90.29 % |
 
-La pantalla **Reportes** consulta `/api/ai/metrics`; no contiene métricas fijas. El dataset es sintético, por lo que estos resultados no prueban eficacia pedagógica real.
+La pantalla **Reportes** separa dos fuentes: `/api/ai/metrics` presenta la validación técnica del clasificador y `/api/teacher/reports/learning-effectiveness` calcula evolución observada con intentos registrados. Las cuentas de demostración se excluyen mediante `users.is_demo`; se comparan las primeras cinco y las últimas cinco respuestas por estudiante y tema. El estado **Eficacia observada** solo aparece con al menos 30 estudiantes, 300 intentos comparables, una mejora mínima de cinco puntos porcentuales y 60 % de estudiantes con evolución positiva.
 
 ## API principal
 
 - Auth: `/api/auth/login`, `/register`, `/refresh`, `/recovery`.
 - Alumno: `/api/student/profile`, `/diagnostic`, `/diagnostics`, `/courses`, `/topics`, `/exercises/next`, `/exercises/offline-pack`, `/activities`, `/notifications`, `/attempts`, `/attempts/sync`, `/progress`, `/history`.
-- Docente: `/api/teacher/dashboard`, `/catalog`, `/students`, `/students/{id}/progress`, `/observations`, `/alerts`, `/notifications`, `/questions`, `/activities`, `/topics/assign`, `/settings`.
+- Docente: `/api/teacher/dashboard`, `/catalog`, `/students`, `/students/{id}/progress`, `/observations`, `/alerts`, `/notifications`, `/questions`, `/activities`, `/topics/assign`, `/reports/learning-effectiveness`, `/settings`.
 - Tiempo real: `/api/teacher/notifications/stream` (SSE).
 - IA: `/api/ai/recommendation`, `/api/ai/metrics`.
 
@@ -217,15 +225,21 @@ Los escenarios y su evidencia están en [PRUEBAS_ACEPTACION.md](docs/PRUEBAS_ACE
 
 - JWT de acceso de 30 minutos y refresh de 7 días.
 - BCrypt con costo 12.
+- Contraseñas nuevas de mínimo ocho caracteres.
 - Rutas protegidas por rol.
+- Registro de docentes protegido por código de invitación.
 - Bloqueo de cinco minutos después de cinco fallos.
 - Recuperación local con código de 15 minutos; sustituir por correo institucional en producción.
+- Recuperación local, cuentas demo y Swagger desactivables mediante variables.
+- Comunicación backend-IA protegida con clave interna.
+- SSE autenticado por cabecera, sin colocar el JWT en la URL.
+- Cabeceras HTTPS, CSP, HSTS, `nosniff`, bloqueo de `iframe` y política de permisos en el frontend desplegado.
 - Validación Bean Validation, CORS acotado y manejo global de excepciones.
 - Secretos solo por entorno; `.env` está ignorado.
 
 ## Limitaciones reales
 
-Lee [DECISIONES_Y_LIMITACIONES.md](docs/DECISIONES_Y_LIMITACIONES.md). Las principales son: dataset sintético, ausencia de TLS/correo en la demo local, contenido curricular pendiente de validación pedagógica y notificaciones internas (no push del sistema operativo).
+Lee [DECISIONES_Y_LIMITACIONES.md](docs/DECISIONES_Y_LIMITACIONES.md). Las principales son: el conjunto inicial del clasificador fue generado de forma controlada, ausencia de TLS/correo en la demo local, contenido curricular pendiente de validación pedagógica y notificaciones internas (no push del sistema operativo). El reporte de eficacia no mezcla ese conjunto con la actividad de estudiantes.
 
 ## Qué falta para completar el proyecto
 

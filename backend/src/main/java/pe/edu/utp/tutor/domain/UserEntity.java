@@ -14,6 +14,7 @@ public class UserEntity {
     @Column(name = "password_hash", nullable = false, length = 100) private String passwordHash;
     @Column(name = "full_name", nullable = false, length = 160) private String fullName;
     @Column(nullable = false) private boolean enabled = true;
+    @Column(name = "is_demo", nullable = false) private boolean demo;
     @Column(name = "failed_attempts", nullable = false) private int failedAttempts;
     @Column(name = "locked_until") private Instant lockedUntil;
     @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();

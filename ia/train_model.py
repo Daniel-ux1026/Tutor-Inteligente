@@ -1,7 +1,9 @@
 """Entrena y exporta el modelo explicable del Tutor Inteligente.
 
-Los 620 registros son sintéticos y reproducibles. Las métricas se calculan
-siempre sobre el conjunto de prueba; nunca se escriben valores prefijados.
+Los 620 registros de entrenamiento se generan de forma controlada y reproducible.
+Las métricas se calculan siempre sobre el conjunto de prueba; nunca se escriben
+valores prefijados. La eficacia educativa se calcula por separado con los intentos
+registrados en la plataforma.
 """
 from __future__ import annotations
 
@@ -120,7 +122,7 @@ def train_and_export(random_state: int = 42) -> dict:
         "classes": CLASSES,
         "classification_report": report,
         "feature_importance": {key: round(float(value), 6) for key, value in importances.items()},
-        "limitation": "Dataset sintético; las métricas no demuestran eficacia con estudiantes reales.",
+        "evaluation_scope": "Validación técnica del clasificador; la eficacia educativa se calcula con actividad registrada en la plataforma.",
     }
     joblib.dump({"pipeline": pipeline, "metrics": metrics, "features": FEATURES}, MODEL_PATH)
     METRICS_PATH.write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")

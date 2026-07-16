@@ -1,5 +1,7 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+  shutdown: graceful
   error:
     include-message: never
 
@@ -9,7 +11,7 @@ spring:
   application:
     name: tutor-inteligente-backend
   datasource:
-    url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=${DB_NAME:TutorInteligente};encrypt=true;trustServerCertificate=true
+    url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=${DB_NAME:TutorInteligente};encrypt=${DB_ENCRYPT:true};trustServerCertificate=${DB_TRUST_SERVER_CERTIFICATE:true};loginTimeout=30
     username: ${DB_USER:sa}
     password: ${DB_PASSWORD}
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
@@ -28,6 +30,8 @@ spring:
     baseline-on-migrate: true
   jackson:
     default-property-inclusion: non_null
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
 
 app:
   jwt:
@@ -37,9 +41,15 @@ app:
   ai:
     base-url: ${AI_SERVICE_URL:http://localhost:8001}
     timeout-ms: 2500
+    api-key: ${AI_SERVICE_API_KEY:}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   demo-data: ${DEMO_DATA:true}
+  registration:
+    teacher-invitation-code: ${TEACHER_INVITATION_CODE:}
+  recovery:
+    enabled: ${RECOVERY_ENABLED:true}
+    expose-local-code: ${RECOVERY_EXPOSE_LOCAL_CODE:true}
 
 management:
   endpoints:
@@ -48,5 +58,8 @@ management:
         include: health,info
 
 springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
   swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
     path: /swagger-ui.html

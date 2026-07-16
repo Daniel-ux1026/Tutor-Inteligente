@@ -13,13 +13,14 @@ public final class ApiDtos {
     public record LoginRequest(@Email @NotBlank String email, @NotBlank String password) { }
     public record RegisterRequest(@NotBlank @Size(max = 160) String fullName,
                                   @Email @NotBlank String email,
-                                  @NotBlank @Size(min = 4, max = 72) String password,
+                                  @NotBlank @Size(min = 8, max = 72) String password,
                                   @Pattern(regexp = "STUDENT|TEACHER") String role,
                                   @Min(1) @Max(5) Integer grade,
-                                  @Size(max = 10) String section) { }
+                                  @Size(max = 10) String section,
+                                  @Size(max = 128) String teacherInvitationCode) { }
     public record RefreshRequest(@NotBlank String refreshToken) { }
     public record RecoveryRequest(@Email @NotBlank String email, String code,
-                                  @Size(min = 4, max = 72) String newPassword) { }
+                                  @Size(min = 8, max = 72) String newPassword) { }
     public record UserSummary(Long id, String email, String fullName, String role,
                               Long profileId, Integer grade, String section) { }
     public record AuthResponse(String accessToken, String refreshToken, long expiresInSeconds, UserSummary user) { }

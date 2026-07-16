@@ -39,3 +39,12 @@ React PWA (5173)
 3. React navega a `/docente/alumnos/{studentId}/avance` con el contexto en query string y estado de navegación.
 4. La página consulta al alumno exacto y aplica la clase de resaltado al tema, intento o alerta origen.
 5. El contexto sobrevive a una recarga porque los identificadores viajan en la URL.
+
+## Flujo de evidencia de aprendizaje
+
+1. Cada intento conserva estudiante, tema, resultado, tiempo y fecha en SQL Server.
+2. `users.is_demo` separa las cuentas de demostración de las cuentas registradas que pueden aportar evidencia.
+3. `/api/teacher/reports/learning-effectiveness` agrupa los intentos por estudiante y tema.
+4. Solo se compara un tema cuando existen diez intentos: las primeras cinco respuestas forman la línea base y las últimas cinco el periodo reciente.
+5. El reporte publica tamaño de muestra, exactitud inicial/reciente, ganancia en puntos porcentuales y porcentaje de estudiantes que mejoró.
+6. La interfaz declara **Eficacia observada** únicamente al superar los mínimos de muestra y mejora; la matriz de confusión permanece como validación técnica independiente.

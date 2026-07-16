@@ -11,9 +11,14 @@ import org.springframework.web.client.RestClient;
 public class RestClientConfig {
     @Bean
     RestClient aiRestClient(@Value("${app.ai.base-url}") String baseUrl,
-                            @Value("${app.ai.timeout-ms}") int timeoutMs) {
+                            @Value("${app.ai.timeout-ms}") int timeoutMs,
+                            @Value("${app.ai.api-key:}") String apiKey) {
         var factory = new JdkClientHttpRequestFactory();
         factory.setReadTimeout(Duration.ofMillis(timeoutMs));
-        return RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+        var builder = RestClient.builder().baseUrl(baseUrl).requestFactory(factory);
+        if (apiKey != null && !apiKey.isBlank()) {
+            builder.defaultHeader("X-Internal-API-Key", apiKey.trim());
+        }
+        return builder.build();
     }
 }

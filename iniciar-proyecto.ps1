@@ -226,16 +226,16 @@ if (-not $SinEntrenarIA -or -not (Test-Path (Join-Path $Root 'ia\models\decision
     Pop-Location
 }
 
-$processes = @()
 $IaArguments = @($PythonPrefixArgs) + @('-m','uvicorn','app.main:app','--host','127.0.0.1','--port','8001')
-$processes += Start-Process $PythonExecutable -ArgumentList $IaArguments -WorkingDirectory (Join-Path $Root 'ia') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Run 'ia.log') -RedirectStandardError (Join-Path $Run 'ia.err.log') -PassThru
+$iaProcess = Start-Process $PythonExecutable -ArgumentList $IaArguments -WorkingDirectory (Join-Path $Root 'ia') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Run 'ia.log') -RedirectStandardError (Join-Path $Run 'ia.err.log') -PassThru
 if ($MavenAvailable) {
-    $processes += Start-Process mvn -ArgumentList 'spring-boot:run' -WorkingDirectory (Join-Path $Root 'backend') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Run 'backend.log') -RedirectStandardError (Join-Path $Run 'backend.err.log') -PassThru
+    $backendProcess = Start-Process mvn -ArgumentList 'spring-boot:run' -WorkingDirectory (Join-Path $Root 'backend') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Run 'backend.log') -RedirectStandardError (Join-Path $Run 'backend.err.log') -PassThru
 } else {
     Write-Host 'Maven no esta en PATH; se usara el JAR verificado incluido.' -ForegroundColor Yellow
-    $processes += Start-Process java -ArgumentList '-jar',$BackendJar -WorkingDirectory (Join-Path $Root 'backend') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Run 'backend.log') -RedirectStandardError (Join-Path $Run 'backend.err.log') -PassThru
+    $backendProcess = Start-Process java -ArgumentList '-jar',$BackendJar -WorkingDirectory (Join-Path $Root 'backend') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Run 'backend.log') -RedirectStandardError (Join-Path $Run 'backend.err.log') -PassThru
 }
-$processes += Start-Process $NpmExecutable -ArgumentList 'run','dev' -WorkingDirectory (Join-Path $Root 'frontend') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Run 'frontend.log') -RedirectStandardError (Join-Path $Run 'frontend.err.log') -PassThru
+$frontendProcess = Start-Process $NpmExecutable -ArgumentList 'run','dev' -WorkingDirectory (Join-Path $Root 'frontend') -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Run 'frontend.log') -RedirectStandardError (Join-Path $Run 'frontend.err.log') -PassThru
+$processes = @($iaProcess, $backendProcess, $frontendProcess)
 
 $processes.Id | Set-Content (Join-Path $Run 'pids.txt')
 Write-Host ''
@@ -249,14 +249,24 @@ Write-Host "Registros: $Run"
 if ($AbrirNavegador) {
     Write-Host 'Esperando a que el sistema este listo...' -ForegroundColor Cyan
     $ready = $false
+    $failedComponent = $null
     for ($i = 0; $i -lt 60 -and -not $ready; $i++) {
         $ready = Test-TutorSystemReady
-        if (-not $ready) { Start-Sleep -Seconds 1 }
+        if (-not $ready) {
+            $iaProcess.Refresh(); $backendProcess.Refresh(); $frontendProcess.Refresh()
+            if ($backendProcess.HasExited) { $failedComponent = 'backend'; break }
+            if ($iaProcess.HasExited) { $failedComponent = 'servicio de IA'; break }
+            if ($frontendProcess.HasExited) { $failedComponent = 'frontend'; break }
+            Start-Sleep -Seconds 1
+        }
     }
 
     if ($ready) {
         Write-Host 'Sistema listo. Abriendo la aplicacion...' -ForegroundColor Green
         Start-Process 'http://127.0.0.1:5173/'
+    } elseif ($failedComponent) {
+        & (Join-Path $Root 'detener-proyecto.ps1')
+        Write-Error "El $failedComponent se detuvo durante el inicio. Revisa los registros en $Run"
     } else {
         Write-Warning "Los procesos se iniciaron, pero alguno no respondio a tiempo. Revisa los registros en $Run"
     }

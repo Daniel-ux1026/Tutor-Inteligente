@@ -2,6 +2,7 @@
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+.vite/
 
 # Backend
 backend/target/
@@ -16,6 +17,9 @@ ia/.pytest_cache/
 *.log
 .idea/
 .vscode/
+.vercel/
+.railway/
 
 # Generated runtime data
 sqlserver-data/
+.run/

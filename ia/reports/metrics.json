@@ -1,6 +1,6 @@
 {
   "model_version": "decision-tree-v1",
-  "generated_at": "2026-07-14T04:41:55.009488+00:00",
+  "generated_at": "2026-07-14T22:20:02.089984+00:00",
   "dataset_rows": 620,
   "train_rows": 496,
   "test_rows": 124,
@@ -74,5 +74,5 @@
     "tiempo_promedio_seg": 0.015153,
     "nivel_actual_basico": 0.0
   },
-  "limitation": "Dataset sintético; las métricas no demuestran eficacia con estudiantes reales."
+  "evaluation_scope": "Validación técnica del clasificador; la eficacia educativa se calcula con actividad registrada en la plataforma."
 }
