@@ -8,7 +8,7 @@ COPY backend/ backend/
 COPY database/ database/
 RUN mvn -f backend/pom.xml -B -DskipTests package
 
-FROM eclipse-temurin:21-jre-noble
+FROM eclipse-temurin:25-jre-noble
 
 RUN groupadd --system tutor && useradd --system --gid tutor --home-dir /app tutor
 WORKDIR /app
