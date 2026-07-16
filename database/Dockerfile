@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/mssql/server:2019-latest
+FROM mcr.microsoft.com/mssql/server:2025-latest
 
 USER root
 COPY database/railway-entrypoint.sh /usr/local/bin/railway-entrypoint.sh
