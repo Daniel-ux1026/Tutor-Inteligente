@@ -7,7 +7,12 @@ if [[ ! "${DB_NAME}" =~ ^[A-Za-z0-9_]+$ ]]; then
   exit 1
 fi
 
-/opt/mssql/bin/sqlservr &
+install -d -o mssql -g root -m 0770 /var/opt/mssql
+chown -R mssql:root /var/opt/mssql
+chmod -R g=u /var/opt/mssql
+export HOME=/var/opt/mssql
+
+runuser -u mssql -- /opt/mssql/bin/sqlservr &
 SQL_PID=$!
 
 stop_sql() {

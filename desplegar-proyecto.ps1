@@ -336,42 +336,7 @@ function Warn-IfPublicDomainExists {
 }
 
 function Configure-ServiceSettings {
-    $settings = @(
-        @("sqlserver", "build.builder", "DOCKERFILE"),
-        @("sqlserver", "build.dockerfilePath", "database/Dockerfile"),
-        @("sqlserver", "deploy.restartPolicyType", "ALWAYS"),
-
-        @("ia", "build.builder", "DOCKERFILE"),
-        @("ia", "build.dockerfilePath", "ia/Dockerfile"),
-        @("ia", "deploy.healthcheckPath", "/health"),
-        @("ia", "deploy.healthcheckTimeout", "180"),
-        @("ia", "deploy.restartPolicyType", "ON_FAILURE"),
-        @("ia", "deploy.restartPolicyMaxRetries", "5"),
-
-        @("backend", "build.builder", "DOCKERFILE"),
-        @("backend", "build.dockerfilePath", "backend/Dockerfile"),
-        @("backend", "deploy.healthcheckPath", "/actuator/health"),
-        @("backend", "deploy.healthcheckTimeout", "300"),
-        @("backend", "deploy.restartPolicyType", "ON_FAILURE"),
-        @("backend", "deploy.restartPolicyMaxRetries", "10"),
-        @("backend", "deploy.drainingSeconds", "20"),
-
-        @("frontend", "build.builder", "DOCKERFILE"),
-        @("frontend", "build.dockerfilePath", "frontend/Dockerfile"),
-        @("frontend", "deploy.healthcheckPath", "/health"),
-        @("frontend", "deploy.healthcheckTimeout", "120"),
-        @("frontend", "deploy.restartPolicyType", "ON_FAILURE"),
-        @("frontend", "deploy.restartPolicyMaxRetries", "5")
-    )
-
-    $arguments = @("environment", "edit", "--message", "Configura despliegue seguro de Tutor Inteligente")
-    foreach ($setting in $settings) {
-        $arguments += @("--service-config", $setting[0], $setting[1], $setting[2])
-    }
-    $arguments += "--json"
-
-    $null = Invoke-RailwayRaw -Arguments $arguments
-    Write-Ok "Dockerfiles, health checks y reinicios configurados."
+    Write-InfoMessage "Las rutas Dockerfile y tiempos de salud se aplicaran mediante variables oficiales de Railway."
 }
 
 function Ensure-SqlVolume {
@@ -399,7 +364,7 @@ function Ensure-SqlVolume {
         throw "No se pudo obtener el identificador del servicio sqlserver."
     }
 
-    $null = Invoke-RailwayRaw -Arguments @("volume", "add", "--service", $serviceId, "--mount-path", "/var/opt/mssql", "--json")
+    $null = Invoke-RailwayRaw -Arguments @("volume", "--service", $serviceId, "add", "--mount-path", "/var/opt/mssql", "--json")
     Write-Ok "Volumen persistente creado en /var/opt/mssql."
 }
 
@@ -429,6 +394,35 @@ function Get-LatestDeploymentStatus {
     }
 
     return $null
+}
+
+function Assert-SqlMemoryCapacity {
+    $metrics = Invoke-RailwayJson -Arguments @(
+        "metrics",
+        "--service", "sqlserver",
+        "--since", "15m",
+        "--memory",
+        "--json"
+    ) -AllowFailure
+
+    if ($null -eq $metrics -or -not $metrics.PSObject.Properties["memory"]) {
+        Write-WarnMessage "Railway todavia no informa el limite de memoria de SQL Server."
+        return
+    }
+
+    $limitProperty = $metrics.memory.PSObject.Properties["limit_mb"]
+    if (-not $limitProperty) {
+        Write-WarnMessage "No fue posible determinar el limite de memoria de SQL Server."
+        return
+    }
+
+    $limitMb = [double]$limitProperty.Value
+    if ($limitMb -gt 0 -and $limitMb -lt 2048) {
+        $roundedLimit = [math]::Round($limitMb)
+        throw "Railway asigna ${roundedLimit} MB al servicio sqlserver. SQL Server para Linux requiere al menos 2048 MB. Actualiza la cuenta a Hobby o superior y vuelve a ejecutar el .bat con -OmitirPruebas."
+    }
+
+    Write-Ok "Memoria disponible para SQL Server: $([math]::Round($limitMb)) MB."
 }
 
 function Wait-RailwayDeployment {
@@ -478,14 +472,14 @@ function Start-RailwayDeployment {
         "--service", $Service,
         "--detach",
         "--yes",
-        "--message", "Despliegue automatico Tutor Inteligente",
-        "."
+        "--message", "Despliegue automatico Tutor Inteligente"
     )
 }
 
 function Wait-HttpHealth {
     param(
         [Parameter(Mandatory = $true)][string]$Url,
+        [Parameter(Mandatory = $true)][string]$Service,
         [int]$TimeoutSeconds = 300
     )
 
@@ -505,7 +499,8 @@ function Wait-HttpHealth {
         Start-Sleep -Seconds 8
     }
 
-    throw "El servicio no respondio correctamente en $Url."
+    $script:UltimoServicio = $Service
+    throw "El servicio '$Service' no respondio correctamente en $Url."
 }
 
 function Test-RequiredFiles {
@@ -738,6 +733,8 @@ try {
         ACCEPT_EULA = "Y"
         MSSQL_PID = "Developer"
         DB_NAME = "TutorInteligente"
+        RAILWAY_DOCKERFILE_PATH = "/database/Dockerfile"
+        HOME = "/var/opt/mssql"
     }
     foreach ($entry in $sqlVariables.GetEnumerator()) {
         Set-RailwayVariable -Service "sqlserver" -Key $entry.Key -Value ([string]$entry.Value)
@@ -746,6 +743,8 @@ try {
     $iaVariables = [ordered]@{
         PORT = "8001"
         AI_DOCS_ENABLED = "false"
+        RAILWAY_DOCKERFILE_PATH = "/ia/Dockerfile"
+        RAILWAY_HEALTHCHECK_TIMEOUT_SEC = "180"
     }
     foreach ($entry in $iaVariables.GetEnumerator()) {
         Set-RailwayVariable -Service "ia" -Key $entry.Key -Value ([string]$entry.Value)
@@ -767,6 +766,9 @@ try {
         RECOVERY_ENABLED = "false"
         RECOVERY_EXPOSE_LOCAL_CODE = "false"
         SWAGGER_ENABLED = "false"
+        RAILWAY_DOCKERFILE_PATH = "/backend/Dockerfile"
+        RAILWAY_HEALTHCHECK_TIMEOUT_SEC = "300"
+        RAILWAY_DEPLOYMENT_DRAINING_SECONDS = "20"
     }
     foreach ($entry in $backendVariables.GetEnumerator()) {
         Set-RailwayVariable -Service "backend" -Key $entry.Key -Value ([string]$entry.Value)
@@ -776,6 +778,8 @@ try {
         PORT = "8080"
         VITE_API_URL = ("https://" + $backendDomain + "/api")
         VITE_DEMO_MODE = "false"
+        RAILWAY_DOCKERFILE_PATH = "/frontend/Dockerfile"
+        RAILWAY_HEALTHCHECK_TIMEOUT_SEC = "120"
     }
     foreach ($entry in $frontendVariables.GetEnumerator()) {
         Set-RailwayVariable -Service "frontend" -Key $entry.Key -Value ([string]$entry.Value)
@@ -787,6 +791,9 @@ try {
     Start-RailwayDeployment -Service "sqlserver"
     Start-RailwayDeployment -Service "ia"
     Wait-RailwayDeployment -Service "sqlserver"
+    Assert-SqlMemoryCapacity
+    Write-InfoMessage "Esperando la inicializacion interna de SQL Server..."
+    Start-Sleep -Seconds 20
     Wait-RailwayDeployment -Service "ia"
 
     Start-RailwayDeployment -Service "backend"
@@ -797,8 +804,8 @@ try {
 
     $backendHealth = "https://$backendDomain/actuator/health"
     $frontendHealth = "https://$frontendDomain/health"
-    Wait-HttpHealth -Url $backendHealth
-    Wait-HttpHealth -Url $frontendHealth
+    Wait-HttpHealth -Url $backendHealth -Service "backend"
+    Wait-HttpHealth -Url $frontendHealth -Service "frontend"
 
     Write-Section "DESPLIEGUE COMPLETADO"
     Write-Host "Aplicacion:              https://$frontendDomain" -ForegroundColor Green

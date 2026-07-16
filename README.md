@@ -49,11 +49,11 @@ Consulta [ARQUITECTURA.md](docs/ARQUITECTURA.md) para los flujos adaptativo, off
 
 La aplicación completa requiere frontend, backend persistente, servicio de IA, eventos SSE y SQL Server. Por ello, Vercel puede alojar opcionalmente el frontend, pero no sustituye por sí solo todo el entorno.
 
-La configuración incluida despliega los cuatro servicios en Railway con frontend y backend públicos por HTTPS, mientras IA y SQL Server permanecen en la red privada. Incluye Dockerfiles sin privilegios, health checks, cabeceras de seguridad, clave interna para la IA, invitación docente, CORS por dominio y controles para desactivar demo, recuperación local y Swagger.
+La configuración incluida despliega los cuatro servicios en Railway con frontend y backend públicos por HTTPS, mientras IA y SQL Server permanecen en la red privada. Incluye Dockerfiles sin privilegios para frontend, backend e IA, health checks, cabeceras de seguridad, clave interna para la IA, invitación docente, CORS por dominio y controles para desactivar demo, recuperación local y Swagger.
 
 Para verificar y desplegar todo automáticamente, haz doble clic en `DESPLEGAR_TUTOR_INTELIGENTE.bat`. La primera ejecución inicia sesión en Railway, crea los cuatro servicios, configura el volumen y los secretos, despliega en orden y abre la web cuando los health checks responden. Las ejecuciones posteriores reutilizan el mismo proyecto y conservan los secretos existentes.
 
-No se necesita Docker Desktop para este despliegue porque las imágenes se construyen en Railway. SQL Server usa la edición Developer, válida para demostración y desarrollo, no para explotación comercial.
+No se necesita Docker Desktop para este despliegue porque las imágenes se construyen en Railway. Se requiere Railway Hobby o superior: Trial limita cada servicio a 1 GB y SQL Server para Linux necesita al menos 2 GB. SQL Server usa la edición Developer, válida para demostración y desarrollo, no para explotación comercial.
 
 Consulta [DESPLIEGUE_SEGURO.md](docs/DESPLIEGUE_SEGURO.md) para los pasos, requisitos, arquitectura, variables y solución de problemas.
 

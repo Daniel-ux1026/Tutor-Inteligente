@@ -27,7 +27,7 @@ Railway proporciona TLS para los dominios públicos y red privada cifrada entre 
 1. JDK 21 y Maven 3.9 o superior.
 2. Node.js 24 LTS, que incluye `npm` y `npx`.
 3. Python 3.12 recomendado para repetir localmente las pruebas de IA. Si no está instalado, el lanzador lo informa y Railway construye el servicio con Python 3.12 dentro del contenedor.
-4. Una cuenta de Railway con un plan que permita ejecutar cuatro servicios y un volumen. SQL Server necesita más memoria que una aplicación web pequeña.
+4. Una cuenta Railway con plan Hobby o superior. Trial limita cada servicio a 1 GB de RAM y SQL Server para Linux requiere al menos 2 GB; el lanzador comprueba este límite y se detiene con un mensaje claro.
 5. Conexión a Internet durante la verificación y el despliegue.
 
 Docker Desktop no es necesario: Railway compila los Dockerfiles en sus propios constructores.
@@ -186,6 +186,7 @@ Después de cambiar una variable `VITE_*`, es necesario volver a desplegar el fr
 
 - Si falla una prueba local, corrige primero el módulo señalado; también puedes usar `-OmitirPruebas` únicamente cuando ya validaste ese mismo commit en GitHub Actions.
 - Si Railway rechaza la creación de recursos, revisa los límites o la facturación de tu cuenta.
+- Si se informa un límite cercano a `1024 MB`, la cuenta está en Trial. Actualiza a Hobby o superior, espera a que el cambio se aplique y vuelve a ejecutar `DESPLEGAR_TUTOR_INTELIGENTE.bat -OmitirPruebas`.
 - Si un servicio falla, el lanzador indica un comando `railway logs` para consultar sus últimas 100 líneas.
 - Si el frontend abre pero no inicia sesión, comprueba que el backend responda en `/actuator/health` y que `CORS_ORIGINS` coincida con el dominio del frontend.
 - Si SQL Server no inicia, revisa que el volumen esté montado en `/var/opt/mssql` y que el plan tenga memoria suficiente.
