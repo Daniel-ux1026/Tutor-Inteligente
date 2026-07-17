@@ -29,7 +29,7 @@ Tutor Inteligente es un prototipo funcional avanzado orientado al acompañamient
 frontend/   React 18 + Vite + React Router + PWA + IndexedDB
 backend/    Java 21 + Spring Boot 3.4 + Security/JWT + JPA + SSE + OpenAPI
 ia/         Python + pandas/numpy/scikit-learn + FastAPI + joblib + notebook
-database/   SQL Server 2019 + Flyway + 20 tablas + 495 ejercicios curriculares
+database/   SQL Server 2022 en Railway (2019/2022 local) + Flyway + 20 tablas
 docs/       auditoría, arquitectura, trazabilidad, pruebas y prototipo heredado
 scripts/    verificación e iconos reproducibles
 ```
@@ -43,13 +43,15 @@ Consulta [ARQUITECTURA.md](docs/ARQUITECTURA.md) para los flujos adaptativo, off
 - Maven 3.9+ para compilar o iniciar el backend desde una clonación nueva. El directorio `backend/target` no se publica en Git.
 - Node.js 24 LTS y npm/npx.
 - Python 3.12 recomendado para repetir localmente las pruebas de IA; Railway lo incluye en el contenedor.
-- Docker Desktop (recomendado) o SQL Server 2019 local.
+- Docker Desktop (recomendado) o SQL Server 2019/2022 local.
 
 ## Despliegue web
 
+Aplicación desplegada: [Tutor Inteligente en Railway](https://frontend-production-e5fd.up.railway.app)
+
 La aplicación completa requiere frontend, backend persistente, servicio de IA, eventos SSE y SQL Server. Por ello, Vercel puede alojar opcionalmente el frontend, pero no sustituye por sí solo todo el entorno.
 
-La configuración incluida despliega los cuatro servicios en Railway con frontend y backend públicos por HTTPS, mientras IA y SQL Server permanecen en la red privada. Incluye Dockerfiles sin privilegios para frontend, backend e IA, health checks, cabeceras de seguridad, clave interna para la IA, invitación docente, CORS por dominio y controles para desactivar demo, recuperación local y Swagger.
+La configuración incluida despliega los cuatro servicios en Railway con frontend y backend públicos por HTTPS, mientras IA y SQL Server permanecen en la red privada. Incluye Dockerfiles sin privilegios para frontend, backend e IA, health checks, cabeceras de seguridad, clave interna para la IA, invitación docente, CORS por dominio y controles para desactivar demo, recuperación local y Swagger. SQL Server 2022 conserva un respaldo completo en un volumen de 5 GB, lo actualiza cada 60 segundos y lo restaura automáticamente en cada despliegue.
 
 Para verificar y desplegar todo automáticamente, haz doble clic en `DESPLEGAR_TUTOR_INTELIGENTE.bat`. La primera ejecución inicia sesión en Railway, crea los cuatro servicios, configura el volumen y los secretos, despliega en orden y abre la web cuando los health checks responden. Las ejecuciones posteriores reutilizan el mismo proyecto y conservan los secretos existentes.
 
