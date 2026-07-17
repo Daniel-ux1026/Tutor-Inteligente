@@ -83,7 +83,9 @@ Cada servicio utiliza el mismo repositorio y una ruta de configuración distinta
 | `ia` | `/ia/railway.json` | `/ia/Dockerfile` | 8001 | `/health` |
 | `sqlserver` | `/database/railway.json` | `/database/Dockerfile` | 1433 | interno |
 
-El lanzador automático aplica estas rutas y adjunta el volumen de `sqlserver` en `/var/opt/mssql`. Los archivos `railway.json` quedan como configuración declarativa de referencia para una configuración manual.
+El lanzador automático aplica estas rutas y adjunta el volumen de `sqlserver` en `/var/opt/mssql/backup`. La base activa usa el disco local compatible con SQL Server y el volumen conserva un respaldo completo: se actualiza cada 60 segundos y durante un apagado normal, y se restaura automáticamente en el siguiente despliegue. Los archivos `railway.json` quedan como configuración declarativa de referencia para una configuración manual.
+
+El contenedor utiliza SQL Server 2022 y, además, limita explícitamente el proceso a 4 CPU y 4096 MB. Esto evita que SQL Server dimensione sus hilos según todos los procesadores físicos del host de Railway en vez de la cuota real del servicio.
 
 ## Variables
 
@@ -189,5 +191,5 @@ Después de cambiar una variable `VITE_*`, es necesario volver a desplegar el fr
 - Si se informa un límite cercano a `1024 MB`, la cuenta está en Trial. Actualiza a Hobby o superior, espera a que el cambio se aplique y vuelve a ejecutar `DESPLEGAR_TUTOR_INTELIGENTE.bat -OmitirPruebas`.
 - Si un servicio falla, el lanzador indica un comando `railway logs` para consultar sus últimas 100 líneas.
 - Si el frontend abre pero no inicia sesión, comprueba que el backend responda en `/actuator/health` y que `CORS_ORIGINS` coincida con el dominio del frontend.
-- Si SQL Server no inicia, revisa que el volumen esté montado en `/var/opt/mssql` y que el plan tenga memoria suficiente.
+- Si SQL Server no inicia, revisa que el volumen esté montado en `/var/opt/mssql/backup`, tenga al menos 5 GB y que el plan tenga memoria suficiente.
 - No publiques dominios para `ia` ni `sqlserver`. Si ya existen, elimínalos desde el panel de Railway.

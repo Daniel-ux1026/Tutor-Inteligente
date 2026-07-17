@@ -13,6 +13,7 @@ $ProgressPreference = "SilentlyContinue"
 
 $script:Raiz = Split-Path -Parent $MyInvocation.MyCommand.Path
 $script:Npx = $null
+$script:RailwayVariablesCache = @{}
 $script:UltimoServicio = $null
 
 Set-Location -LiteralPath $script:Raiz
@@ -183,11 +184,16 @@ function Set-RailwayVariable {
 function Get-RailwayVariables {
     param([Parameter(Mandatory = $true)][string]$Service)
 
-    $variables = Invoke-RailwayJson -Arguments @("variable", "list", "--service", $Service, "--json") -Sensitive
-    if ($null -eq $variables) {
-        return [pscustomobject]@{}
+    if ($script:RailwayVariablesCache.ContainsKey($Service)) {
+        return $script:RailwayVariablesCache[$Service]
     }
 
+    $variables = Invoke-RailwayJson -Arguments @("variable", "list", "--service", $Service, "--json") -Sensitive
+    if ($null -eq $variables) {
+        $variables = [pscustomobject]@{}
+    }
+
+    $script:RailwayVariablesCache[$Service] = $variables
     return $variables
 }
 
@@ -236,6 +242,22 @@ function Ensure-SecretVariable {
     $value = & $Generator
     Set-RailwayVariable -Service $Service -Key $Key -Value $value
     return $value
+}
+
+function Set-RailwayVariablesIfChanged {
+    param(
+        [Parameter(Mandatory = $true)][string]$Service,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Values
+    )
+
+    $currentVariables = Get-RailwayVariables -Service $Service
+    foreach ($entry in $Values.GetEnumerator()) {
+        $desiredValue = [string]$entry.Value
+        $currentValue = Get-PropertyValue -Object $currentVariables -Name ([string]$entry.Key)
+        if ($currentValue -cne $desiredValue) {
+            Set-RailwayVariable -Service $Service -Key ([string]$entry.Key) -Value $desiredValue
+        }
+    }
 }
 
 function Get-ServiceItems {
@@ -342,21 +364,32 @@ function Configure-ServiceSettings {
 function Ensure-SqlVolume {
     param([Parameter(Mandatory = $true)]$SqlService)
 
-    $raw = Invoke-RailwayRaw -Arguments @("volume", "list", "--json") -AllowFailure
+    $mountPath = "/var/opt/mssql/backup"
+    $data = Invoke-RailwayJson -Arguments @("volume", "list", "--json") -AllowFailure
     $serviceId = [string]$SqlService.id
-    $hasVolume = $false
-
-    if ($raw) {
-        if ($raw -match [regex]::Escape("/var/opt/mssql")) {
-            $hasVolume = $true
-        }
-        elseif ($serviceId -and $raw -match [regex]::Escape($serviceId)) {
-            $hasVolume = $true
-        }
+    $sqlVolumes = @()
+    if ($null -ne $data -and $data.PSObject.Properties["volumes"]) {
+        $sqlVolumes = @(
+            @($data.volumes) | Where-Object {
+                $_.serviceName -eq "sqlserver" -and -not $_.deletedAt
+            }
+        )
     }
 
-    if ($hasVolume) {
-        Write-Ok "El volumen persistente de SQL Server ya existe."
+    if ($sqlVolumes.Count -gt 0) {
+        $volume = $sqlVolumes[0]
+        if ([string]$volume.mountPath -ne $mountPath) {
+            $null = Invoke-RailwayRaw -Arguments @(
+                "volume", "update",
+                "--volume", ([string]$volume.id),
+                "--mount-path", $mountPath,
+                "--json"
+            )
+            Write-Ok "Volumen persistente actualizado a $mountPath."
+        }
+        else {
+            Write-Ok "El volumen persistente de SQL Server ya existe en $mountPath."
+        }
         return
     }
 
@@ -364,8 +397,34 @@ function Ensure-SqlVolume {
         throw "No se pudo obtener el identificador del servicio sqlserver."
     }
 
-    $null = Invoke-RailwayRaw -Arguments @("volume", "--service", $serviceId, "add", "--mount-path", "/var/opt/mssql", "--json")
-    Write-Ok "Volumen persistente creado en /var/opt/mssql."
+    $null = Invoke-RailwayRaw -Arguments @("volume", "--service", $serviceId, "add", "--mount-path", $mountPath, "--json")
+    Write-Ok "Volumen persistente creado en $mountPath."
+}
+
+function Assert-SqlVolumeCapacity {
+    $data = Invoke-RailwayJson -Arguments @("volume", "list", "--json") -AllowFailure
+    if ($null -eq $data -or -not $data.PSObject.Properties["volumes"]) {
+        Write-WarnMessage "Railway todavia no informa la capacidad del volumen de SQL Server."
+        return
+    }
+
+    $sqlVolumes = @(
+        @($data.volumes) | Where-Object {
+            $_.serviceName -eq "sqlserver" -and $_.mountPath -eq "/var/opt/mssql/backup" -and -not $_.deletedAt
+        }
+    )
+    if ($sqlVolumes.Count -eq 0) {
+        Write-WarnMessage "No fue posible identificar el volumen persistente de SQL Server."
+        return
+    }
+
+    $sizeMb = [double]$sqlVolumes[0].sizeMB
+    if ($sizeMb -lt 5000) {
+        $roundedSize = [math]::Round($sizeMb)
+        throw "El volumen de sqlserver conserva ${roundedSize} MB del plan Trial y SQL Server se queda sin espacio. En Railway abre sqlserver > Volume > Settings, redimensionalo a 5 GB y vuelve a ejecutar el .bat con -OmitirPruebas. La ampliacion conserva los datos."
+    }
+
+    Write-Ok "Volumen disponible para SQL Server: $([math]::Round($sizeMb)) MB."
 }
 
 function Get-LatestDeploymentStatus {
@@ -397,32 +456,85 @@ function Get-LatestDeploymentStatus {
 }
 
 function Assert-SqlMemoryCapacity {
-    $metrics = Invoke-RailwayJson -Arguments @(
-        "metrics",
-        "--service", "sqlserver",
-        "--since", "15m",
-        "--memory",
-        "--json"
-    ) -AllowFailure
+    $deadline = (Get-Date).AddSeconds(90)
+    $limitMb = $null
 
-    if ($null -eq $metrics -or -not $metrics.PSObject.Properties["memory"]) {
+    do {
+        $metrics = Invoke-RailwayJson -Arguments @(
+            "metrics",
+            "--service", "sqlserver",
+            "--since", "5m",
+            "--memory",
+            "--raw",
+            "--json"
+        ) -AllowFailure
+
+        if ($null -ne $metrics -and $metrics.PSObject.Properties["measurements"]) {
+            $limitSeries = $metrics.measurements.PSObject.Properties["MEMORY_LIMIT_GB"]
+            if ($limitSeries) {
+                $latestSample = @($limitSeries.Value) |
+                    Where-Object { $_.PSObject.Properties["value"] -and [double]$_.value -gt 0 } |
+                    Sort-Object { [datetimeoffset]$_.ts } |
+                    Select-Object -Last 1
+
+                if ($latestSample) {
+                    $limitMb = [double]$latestSample.value * 1024
+                }
+            }
+        }
+
+        if ($null -ne $limitMb -and $limitMb -ge 2048) {
+            break
+        }
+
+        if ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 15
+        }
+    } while ((Get-Date) -lt $deadline)
+
+    if ($null -eq $limitMb) {
         Write-WarnMessage "Railway todavia no informa el limite de memoria de SQL Server."
         return
     }
 
-    $limitProperty = $metrics.memory.PSObject.Properties["limit_mb"]
-    if (-not $limitProperty) {
-        Write-WarnMessage "No fue posible determinar el limite de memoria de SQL Server."
-        return
-    }
-
-    $limitMb = [double]$limitProperty.Value
     if ($limitMb -gt 0 -and $limitMb -lt 2048) {
         $roundedLimit = [math]::Round($limitMb)
         throw "Railway asigna ${roundedLimit} MB al servicio sqlserver. SQL Server para Linux requiere al menos 2048 MB. Actualiza la cuenta a Hobby o superior y vuelve a ejecutar el .bat con -OmitirPruebas."
     }
 
     Write-Ok "Memoria disponible para SQL Server: $([math]::Round($limitMb)) MB."
+}
+
+function Wait-SqlServerReady {
+    param([int]$TimeoutSeconds = 300)
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    Write-InfoMessage "Esperando que SQL Server acepte conexiones..."
+
+    while ((Get-Date) -lt $deadline) {
+        $logs = Invoke-RailwayRaw -Arguments @(
+            "logs",
+            "--service", "sqlserver",
+            "--latest",
+            "--lines", "200"
+        ) -AllowFailure
+
+        if ($logs -and $logs -match "TUTOR_SQLSERVER_READY") {
+            Write-Ok "SQL Server acepta conexiones y la base inicial esta disponible."
+            return
+        }
+
+        $status = Get-LatestDeploymentStatus -Service "sqlserver"
+        if ($status -in @("FAILED", "CRASHED", "REMOVED", "CANCELED", "CANCELLED")) {
+            $script:UltimoServicio = "sqlserver"
+            throw "SQL Server no pudo completar su inicializacion (estado $status)."
+        }
+
+        Start-Sleep -Seconds 10
+    }
+
+    $script:UltimoServicio = "sqlserver"
+    throw "SQL Server no confirmo que acepta conexiones dentro de ${TimeoutSeconds} segundos."
 }
 
 function Wait-RailwayDeployment {
@@ -702,6 +814,7 @@ try {
     $null = Ensure-Service -Name "frontend"
 
     Ensure-SqlVolume -SqlService $sqlService
+    Assert-SqlVolumeCapacity
     Configure-ServiceSettings
 
     $backendDomain = Ensure-PublicDomain -Service "backend" -Port 8080
@@ -736,9 +849,7 @@ try {
         RAILWAY_DOCKERFILE_PATH = "/database/Dockerfile"
         HOME = "/var/opt/mssql"
     }
-    foreach ($entry in $sqlVariables.GetEnumerator()) {
-        Set-RailwayVariable -Service "sqlserver" -Key $entry.Key -Value ([string]$entry.Value)
-    }
+    Set-RailwayVariablesIfChanged -Service "sqlserver" -Values $sqlVariables
 
     $iaVariables = [ordered]@{
         PORT = "8001"
@@ -746,9 +857,7 @@ try {
         RAILWAY_DOCKERFILE_PATH = "/ia/Dockerfile"
         RAILWAY_HEALTHCHECK_TIMEOUT_SEC = "180"
     }
-    foreach ($entry in $iaVariables.GetEnumerator()) {
-        Set-RailwayVariable -Service "ia" -Key $entry.Key -Value ([string]$entry.Value)
-    }
+    Set-RailwayVariablesIfChanged -Service "ia" -Values $iaVariables
 
     $backendVariables = [ordered]@{
         PORT = "8080"
@@ -770,9 +879,7 @@ try {
         RAILWAY_HEALTHCHECK_TIMEOUT_SEC = "300"
         RAILWAY_DEPLOYMENT_DRAINING_SECONDS = "20"
     }
-    foreach ($entry in $backendVariables.GetEnumerator()) {
-        Set-RailwayVariable -Service "backend" -Key $entry.Key -Value ([string]$entry.Value)
-    }
+    Set-RailwayVariablesIfChanged -Service "backend" -Values $backendVariables
 
     $frontendVariables = [ordered]@{
         PORT = "8080"
@@ -781,9 +888,7 @@ try {
         RAILWAY_DOCKERFILE_PATH = "/frontend/Dockerfile"
         RAILWAY_HEALTHCHECK_TIMEOUT_SEC = "120"
     }
-    foreach ($entry in $frontendVariables.GetEnumerator()) {
-        Set-RailwayVariable -Service "frontend" -Key $entry.Key -Value ([string]$entry.Value)
-    }
+    Set-RailwayVariablesIfChanged -Service "frontend" -Values $frontendVariables
 
     Write-Ok "Variables configuradas. Los secretos no se guardaron en el repositorio."
 
@@ -792,8 +897,7 @@ try {
     Start-RailwayDeployment -Service "ia"
     Wait-RailwayDeployment -Service "sqlserver"
     Assert-SqlMemoryCapacity
-    Write-InfoMessage "Esperando la inicializacion interna de SQL Server..."
-    Start-Sleep -Seconds 20
+    Wait-SqlServerReady
     Wait-RailwayDeployment -Service "ia"
 
     Start-RailwayDeployment -Service "backend"
