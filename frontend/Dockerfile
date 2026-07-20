@@ -15,7 +15,7 @@ ENV VITE_DEMO_MODE=${VITE_DEMO_MODE}
 
 RUN pnpm build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
